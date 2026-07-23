@@ -4,6 +4,9 @@ import random
 from bs4 import BeautifulSoup
 import re
 import time
+from datetime import datetime
+import json
+import os
 
 # Configuração da página Streamlit
 st.set_page_config(
@@ -78,7 +81,6 @@ def get_random_frase():
 
 def extrair_csrf_token(html):
     """Extrai o token CSRF do HTML da página"""
-    # Procura por input hidden com name '_wpnonce' ou similar
     soup = BeautifulSoup(html, 'html.parser')
     
     # Tenta encontrar o token CSRF
@@ -86,23 +88,63 @@ def extrair_csrf_token(html):
     if token_input:
         return token_input.get('value', '')
     
-    # Tenta encontrar no formato mais comum do Elementor
     token_input = soup.find('input', {'id': '_wpnonce'})
     if token_input:
         return token_input.get('value', '')
     
-    # Procura por qualquer input hidden com nonce
     token_input = soup.find('input', {'type': 'hidden', 'name': re.compile(r'nonce|_wpnonce', re.I)})
     if token_input:
         return token_input.get('value', '')
     
-    # Se não encontrar, tenta extrair do JavaScript
     script_pattern = r'var\s+nonce\s*=\s*[\'"]([^\'"]+)[\'"]'
     script_match = re.search(script_pattern, html)
     if script_match:
         return script_match.group(1)
     
     return ''
+
+def gerar_arquivo_log(dados_envio, status_envio, mensagem_retorno=""):
+    """Gera um arquivo de log com todos os dados enviados"""
+    data_hora = datetime.now().strftime("%Y%m%d_%H%M%S")
+    data_hora_formatada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Estrutura do log
+    log = {
+        "data_hora_envio": data_hora_formatada,
+        "timestamp_unix": int(time.time()),
+        "status_envio": status_envio,
+        "mensagem_retorno": mensagem_retorno,
+        "dados_enviados": dados_envio
+    }
+    
+    # Nome do arquivo
+    nome_arquivo = f"log_envio_{data_hora}.json"
+    
+    # Salvar como JSON
+    with open(nome_arquivo, 'w', encoding='utf-8') as f:
+        json.dump(log, f, ensure_ascii=False, indent=4)
+    
+    # Também salvar como TXT para fácil leitura
+    nome_arquivo_txt = f"log_envio_{data_hora}.txt"
+    with open(nome_arquivo_txt, 'w', encoding='utf-8') as f:
+        f.write("=" * 80 + "\n")
+        f.write("LOG DE ENVIO DE FORMULÁRIO - GNX GROUP\n")
+        f.write("=" * 80 + "\n\n")
+        f.write(f"Data/Hora do Envio: {data_hora_formatada}\n")
+        f.write(f"Timestamp UNIX: {int(time.time())}\n")
+        f.write(f"Status: {status_envio}\n")
+        if mensagem_retorno:
+            f.write(f"Mensagem: {mensagem_retorno}\n")
+        f.write("\n" + "-" * 80 + "\n")
+        f.write("DADOS ENVIADOS:\n")
+        f.write("-" * 80 + "\n")
+        for campo, valor in dados_envio.items():
+            f.write(f"{campo}: {valor}\n")
+        f.write("\n" + "=" * 80 + "\n")
+        f.write("FIM DO LOG\n")
+        f.write("=" * 80 + "\n")
+    
+    return nome_arquivo, nome_arquivo_txt, log
 
 def preencher_formulario_api(nome, email, telefone, empresa):
     """Preenche o formulário usando requests (POST direto)"""
@@ -165,6 +207,18 @@ def preencher_formulario_api(nome, email, telefone, empresa):
         
         st.info("📤 Enviando formulário...")
         
+        # Prepara os dados para o log
+        dados_para_log = {
+            'Nome': nome,
+            'Email': email,
+            'Telefone': telefone,
+            'Empresa': empresa,
+            'Departamento': departamento,
+            'Segmento': segmento,
+            'Mensagem': mensagem,
+            'Token_CSRF': token if token else 'Não encontrado'
+        }
+        
         # Envia o POST
         post_response = session.post(
             url,
@@ -175,7 +229,7 @@ def preencher_formulario_api(nome, email, telefone, empresa):
         
         # Verifica se foi bem-sucedido
         if post_response.status_code == 200:
-            # Verifica se há mensagem de sucesso na página
+            # Tenta encontrar o botão e clicar via JavaScript
             soup = BeautifulSoup(post_response.text, 'html.parser')
             
             # Procura por mensagens de sucesso
@@ -183,37 +237,87 @@ def preencher_formulario_api(nome, email, telefone, empresa):
                                            text=re.compile(r'(sucesso|success|enviado|obrigado|agradecimento)', re.I))
             
             if success_messages:
-                return {
-                    "status": "sucesso",
-                    "departamento": departamento,
-                    "segmento": segmento,
-                    "mensagem": mensagem,
-                    "detalhe": "Formulário enviado com sucesso!"
-                }
+                mensagem_retorno = "Formulário enviado com sucesso!"
+                status_envio = "SUCESSO"
             else:
-                # Pode ter enviado mesmo sem mensagem de sucesso
-                return {
-                    "status": "sucesso",
-                    "departamento": departamento,
-                    "segmento": segmento,
-                    "mensagem": mensagem,
-                    "detalhe": "Formulário enviado (verifique se recebeu o email de confirmação)"
-                }
+                mensagem_retorno = "Formulário enviado (verifique se recebeu o email de confirmação)"
+                status_envio = "ENVIADO"
+            
+            # Gerar arquivo de log
+            nome_json, nome_txt, log_completo = gerar_arquivo_log(
+                dados_para_log, 
+                status_envio, 
+                mensagem_retorno
+            )
+            
+            return {
+                "status": "sucesso",
+                "departamento": departamento,
+                "segmento": segmento,
+                "mensagem": mensagem,
+                "detalhe": mensagem_retorno,
+                "log_json": nome_json,
+                "log_txt": nome_txt,
+                "log_completo": log_completo
+            }
         else:
+            # Mesmo com erro, gerar log
+            dados_para_log = {
+                'Nome': nome,
+                'Email': email,
+                'Telefone': telefone,
+                'Empresa': empresa,
+                'Departamento': departamento,
+                'Segmento': segmento,
+                'Mensagem': mensagem,
+                'Token_CSRF': token if token else 'Não encontrado'
+            }
+            
+            mensagem_erro = f"Erro {post_response.status_code}: {post_response.text[:200]}"
+            nome_json, nome_txt, log_completo = gerar_arquivo_log(
+                dados_para_log, 
+                "ERRO", 
+                mensagem_erro
+            )
+            
             return {
                 "status": "erro",
-                "mensagem_erro": f"Erro {post_response.status_code}: {post_response.text[:200]}"
+                "mensagem_erro": mensagem_erro,
+                "log_json": nome_json,
+                "log_txt": nome_txt,
+                "log_completo": log_completo
             }
             
     except requests.exceptions.RequestException as e:
+        dados_para_log = {
+            'Nome': nome,
+            'Email': email,
+            'Telefone': telefone,
+            'Empresa': empresa,
+            'Departamento': 'N/A',
+            'Segmento': 'N/A',
+            'Mensagem': 'N/A',
+            'Token_CSRF': 'N/A'
+        }
+        mensagem_erro = f"Erro de conexão: {str(e)}"
+        nome_json, nome_txt, log_completo = gerar_arquivo_log(
+            dados_para_log, 
+            "ERRO_CONEXAO", 
+            mensagem_erro
+        )
+        
         return {
             "status": "erro",
-            "mensagem_erro": f"Erro de conexão: {str(e)}"
+            "mensagem_erro": mensagem_erro,
+            "log_json": nome_json,
+            "log_txt": nome_txt,
+            "log_completo": log_completo
         }
     except Exception as e:
+        mensagem_erro = f"Erro inesperado: {str(e)}"
         return {
             "status": "erro",
-            "mensagem_erro": f"Erro inesperado: {str(e)}"
+            "mensagem_erro": mensagem_erro
         }
 
 def main():
@@ -249,9 +353,65 @@ def main():
                     with col2:
                         st.text_area("💬 Mensagem Enviada", resultado["mensagem"], height=150)
                     
+                    # Mostrar informações do log
+                    if "log_completo" in resultado:
+                        st.markdown("---")
+                        st.subheader("📄 Log de Envio")
+                        
+                        # Exibir o log formatado
+                        log_data = resultado["log_completo"]
+                        col_log1, col_log2 = st.columns(2)
+                        with col_log1:
+                            st.json(log_data)
+                        
+                        with col_log2:
+                            st.info(f"📁 Arquivos gerados:")
+                            if "log_json" in resultado:
+                                st.code(f"✅ {resultado['log_json']}", language="bash")
+                            if "log_txt" in resultado:
+                                st.code(f"✅ {resultado['log_txt']}", language="bash")
+                            
+                            # Botão para download do log JSON
+                            if "log_json" in resultado:
+                                with open(resultado["log_json"], 'r', encoding='utf-8') as f:
+                                    json_content = f.read()
+                                st.download_button(
+                                    label="📥 Baixar Log (JSON)",
+                                    data=json_content,
+                                    file_name=resultado["log_json"],
+                                    mime="application/json"
+                                )
+                            
+                            # Botão para download do log TXT
+                            if "log_txt" in resultado:
+                                with open(resultado["log_txt"], 'r', encoding='utf-8') as f:
+                                    txt_content = f.read()
+                                st.download_button(
+                                    label="📥 Baixar Log (TXT)",
+                                    data=txt_content,
+                                    file_name=resultado["log_txt"],
+                                    mime="text/plain"
+                                )
+                    
                     st.balloons()
                 else:
                     st.error(f"❌ Erro ao enviar formulário: {resultado['mensagem_erro']}")
+                    
+                    # Mostrar log mesmo em caso de erro
+                    if "log_completo" in resultado:
+                        st.markdown("---")
+                        st.subheader("📄 Log de Erro")
+                        st.json(resultado["log_completo"])
+                        
+                        if "log_json" in resultado:
+                            with open(resultado["log_json"], 'r', encoding='utf-8') as f:
+                                json_content = f.read()
+                            st.download_button(
+                                label="📥 Baixar Log de Erro (JSON)",
+                                data=json_content,
+                                file_name=resultado["log_json"],
+                                mime="application/json"
+                            )
     
     # Botão para gerar uma frase aleatória
     st.sidebar.markdown("---")
@@ -268,6 +428,7 @@ def main():
     2. Clique em "Executar Automação"
     3. O sistema preencherá automaticamente o formulário
     4. Os campos 'Departamento' e 'Segmento' são sorteados aleatoriamente
+    5. Um arquivo de log é gerado com todos os dados enviados
     """)
     
     # Área principal
@@ -290,6 +451,28 @@ def main():
             st.write(f"{i}. {frase}")
         if len(FRASES_HABILIDADES) > 10:
             st.write(f"... e mais {len(FRASES_HABILIDADES) - 10} frases disponíveis")
+    
+    # Exemplo de log
+    st.markdown("---")
+    st.subheader("📋 Exemplo de Log Gerado")
+    with st.expander("Ver exemplo do formato do log"):
+        exemplo_log = {
+            "data_hora_envio": "2024-01-15 14:30:25",
+            "timestamp_unix": 1705339825,
+            "status_envio": "SUCESSO",
+            "mensagem_retorno": "Formulário enviado com sucesso!",
+            "dados_enviados": {
+                "Nome": "Rodrigo Aiosa",
+                "Email": "rodrigoaiosa@gmail.com",
+                "Telefone": "11977019335",
+                "Empresa": "Sky Data Soluction",
+                "Departamento": "Marketing",
+                "Segmento": "Tecnologia da Informação",
+                "Mensagem": "Profissional com expertise em Python para automação de processos...",
+                "Token_CSRF": "abc123def456"
+            }
+        }
+        st.json(exemplo_log)
     
     # Requisitos
     st.markdown("---")
