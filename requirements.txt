@@ -1,4 +1,4 @@
-streamlit>
-selenium
-webdriver-manager
-pandas
+streamlit
+requests
+beautifulsoup4
+lxml
