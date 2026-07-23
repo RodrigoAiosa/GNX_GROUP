@@ -1,0 +1,132 @@
+/* Estilos personalizados */
+.stApp {
+    background-color: #0E1117;
+}
+
+.stButton > button {
+    background-color: #FF4B4B;
+    color: white;
+    border-radius: 8px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.stButton > button:hover {
+    background-color: #FF6B6B;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 75, 75, 0.3);
+}
+
+.stMetric {
+    background-color: #1E1E24;
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid #333;
+}
+
+.stTextArea > div > div > textarea {
+    background-color: #1E1E24;
+    color: #FAFAFA;
+    border: 1px solid #333;
+    border-radius: 8px;
+}
+
+.stSelectbox > div > div {
+    background-color: #1E1E24;
+    border-radius: 8px;
+}
+
+.stInfo {
+    background-color: #1E3A5F;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.stSuccess {
+    background-color: #1E3A2F;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.stError {
+    background-color: #3A1E1E;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+/* Animação dos balloons */
+.balloon {
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
+/* Estilo para os métricas */
+div[data-testid="metric-container"] {
+    background-color: #1E1E24;
+    border: 1px solid #333;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+div[data-testid="metric-container"] > label {
+    color: #888;
+    font-size: 14px;
+}
+
+div[data-testid="metric-container"] > div {
+    color: #FAFAFA;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+/* Estilo para os expanders */
+.streamlit-expanderHeader {
+    background-color: #1E1E24;
+    border-radius: 8px;
+    border: 1px solid #333;
+}
+
+.streamlit-expanderContent {
+    background-color: #0E1117;
+    border: 1px solid #333;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+}
+
+/* Estilo para os textos */
+h1, h2, h3, h4, h5, h6 {
+    color: #FAFAFA !important;
+}
+
+p, div, span, label {
+    color: #E0E0E0 !important;
+}
+
+/* Estilo para o sidebar */
+.css-1d391kg {
+    background-color: #1E1E24;
+}
+
+.css-1d391kg .stButton > button {
+    background-color: #FF4B4B;
+    width: 100%;
+}
+
+/* Estilo para os downloads */
+.stDownloadButton > button {
+    background-color: #4CAF50;
+    color: white;
+    border-radius: 8px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.stDownloadButton > button:hover {
+    background-color: #5CBF60;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
