@@ -1,5 +1,5 @@
 # Arquivo de inicialização do módulo utils
-from .form_handler import preencher_formulario_api
+from .form_handler import preencher_formulario_api, URL_FORMULARIO
 from .log_generator import gerar_arquivo_log_tabela
 from .data_manager import (
     carregar_frases,
@@ -12,6 +12,7 @@ from .data_manager import (
 
 __all__ = [
     'preencher_formulario_api',
+    'URL_FORMULARIO',
     'gerar_arquivo_log_tabela',
     'carregar_frases',
     'carregar_departamentos',
