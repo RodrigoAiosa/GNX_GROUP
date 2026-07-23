@@ -10,6 +10,8 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 import pandas as pd
 import os
+import subprocess
+import sys
 
 # Configuração da página Streamlit
 st.set_page_config(
@@ -82,50 +84,107 @@ def get_random_frase():
     """Retorna uma frase aleatória sobre habilidades"""
     return random.choice(FRASES_HABILIDADES)
 
+def install_chrome():
+    """Instala o Chrome no ambiente do Streamlit Cloud"""
+    try:
+        # Verifica se o Chrome já está instalado
+        result = subprocess.run(['google-chrome', '--version'], capture_output=True, text=True)
+        if result.returncode == 0:
+            st.info("✅ Chrome já está instalado")
+            return True
+    except:
+        pass
+    
+    try:
+        st.info("📦 Instalando Chrome...")
+        # Para sistemas Linux (Ubuntu/Debian)
+        subprocess.run(['apt-get', 'update'], check=True, capture_output=True)
+        subprocess.run(['apt-get', 'install', '-y', 'wget', 'unzip'], check=True, capture_output=True)
+        
+        # Baixa e instala o Chrome
+        subprocess.run(['wget', '-q', 'https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb'], check=True)
+        subprocess.run(['dpkg', '-i', 'google-chrome-stable_current_amd64.deb'], check=True, capture_output=True)
+        subprocess.run(['apt-get', 'install', '-f', '-y'], check=True, capture_output=True)
+        
+        # Limpa o arquivo .deb
+        subprocess.run(['rm', 'google-chrome-stable_current_amd64.deb'], check=True)
+        
+        st.success("✅ Chrome instalado com sucesso!")
+        return True
+    except Exception as e:
+        st.error(f"❌ Erro ao instalar Chrome: {str(e)}")
+        return False
+
 def setup_driver():
     """Configura o driver do Chrome com opções para ambiente headless"""
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--window-size=1920,1080")
-    
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    return driver
+    try:
+        # Instala o Chrome se necessário
+        if not install_chrome():
+            return None
+        
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--disable-setuid-sandbox")
+        chrome_options.add_argument("--remote-debugging-port=9222")
+        chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        
+        # Tenta usar o ChromeDriver com webdriver-manager
+        try:
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            return driver
+        except:
+            # Fallback: tenta usar o ChromeDriver do sistema
+            service = Service('/usr/local/bin/chromedriver')
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            return driver
+            
+    except Exception as e:
+        st.error(f"❌ Erro ao configurar driver: {str(e)}")
+        return None
 
 def preencher_formulario(driver, nome, email, telefone, empresa):
     """Preenche o formulário com os dados fornecidos"""
     try:
         # Abrir a página
+        st.info("🌐 Acessando o site...")
         driver.get("https://gnxgroup.com.br/solucoes/temporarios/")
-        time.sleep(3)
+        time.sleep(5)
         
         # Aguardar o carregamento dos elementos
-        wait = WebDriverWait(driver, 10)
+        wait = WebDriverWait(driver, 20)
         
         # Preencher Nome
+        st.info("📝 Preenchendo nome...")
         nome_field = wait.until(EC.presence_of_element_located((By.XPATH, "//*[@id='form-field-nome']")))
         nome_field.clear()
         nome_field.send_keys(nome)
         
         # Preencher Email
+        st.info("📧 Preenchendo email...")
         email_field = driver.find_element(By.XPATH, "//*[@id='form-field-email']")
         email_field.clear()
         email_field.send_keys(email)
         
         # Preencher Telefone
+        st.info("📱 Preenchendo telefone...")
         telefone_field = driver.find_element(By.XPATH, "//*[@id='form-field-telefone']")
         telefone_field.clear()
         telefone_field.send_keys(telefone)
         
         # Preencher Empresa
+        st.info("🏢 Preenchendo empresa...")
         empresa_field = driver.find_element(By.XPATH, "//*[@id='form-field-empresa']")
         empresa_field.clear()
         empresa_field.send_keys(empresa)
         
         # Selecionar Departamento (sorteio)
+        st.info("🎲 Selecionando departamento...")
         departamento = get_random_departamento()
         departamento_select = driver.find_element(By.XPATH, "//*[@id='form-field-departamento']")
         for option in departamento_select.find_elements(By.TAG_NAME, "option"):
@@ -134,6 +193,7 @@ def preencher_formulario(driver, nome, email, telefone, empresa):
                 break
         
         # Selecionar Segmento (sorteio)
+        st.info("🎲 Selecionando segmento...")
         segmento = get_random_segmento()
         segmento_select = driver.find_element(By.XPATH, "//*[@id='form-field-segmento']")
         for option in segmento_select.find_elements(By.TAG_NAME, "option"):
@@ -142,10 +202,20 @@ def preencher_formulario(driver, nome, email, telefone, empresa):
                 break
         
         # Preencher Mensagem com frase aleatória
+        st.info("💬 Gerando mensagem...")
         mensagem = get_random_frase()
         mensagem_field = driver.find_element(By.XPATH, "//*[@id='form-field-mensagem_profissional']")
         mensagem_field.clear()
         mensagem_field.send_keys(mensagem)
+        
+        # Tentar enviar o formulário (opcional)
+        try:
+            st.info("📤 Enviando formulário...")
+            submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
+            submit_button.click()
+            time.sleep(3)
+        except:
+            st.warning("⚠️ Não foi possível enviar o formulário automaticamente")
         
         return {
             "status": "sucesso",
@@ -180,26 +250,29 @@ def main():
                     # Configurar driver
                     driver = setup_driver()
                     
-                    # Executar automação
-                    resultado = preencher_formulario(driver, nome, email, telefone, empresa)
-                    
-                    driver.quit()
-                    
-                    if resultado["status"] == "sucesso":
-                        st.success("✅ Formulário preenchido com sucesso!")
-                        
-                        # Mostrar detalhes do preenchimento
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.metric("📋 Departamento Selecionado", resultado["departamento"])
-                            st.metric("🏢 Segmento Selecionado", resultado["segmento"])
-                        
-                        with col2:
-                            st.text_area("💬 Mensagem Enviada", resultado["mensagem"], height=150)
-                        
-                        st.balloons()
+                    if driver is None:
+                        st.error("❌ Não foi possível iniciar o driver. Verifique a instalação do Chrome.")
                     else:
-                        st.error(f"❌ Erro ao preencher o formulário: {resultado['mensagem_erro']}")
+                        # Executar automação
+                        resultado = preencher_formulario(driver, nome, email, telefone, empresa)
+                        
+                        driver.quit()
+                        
+                        if resultado["status"] == "sucesso":
+                            st.success("✅ Formulário preenchido com sucesso!")
+                            
+                            # Mostrar detalhes do preenchimento
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.metric("📋 Departamento Selecionado", resultado["departamento"])
+                                st.metric("🏢 Segmento Selecionado", resultado["segmento"])
+                            
+                            with col2:
+                                st.text_area("💬 Mensagem Enviada", resultado["mensagem"], height=150)
+                            
+                            st.balloons()
+                        else:
+                            st.error(f"❌ Erro ao preencher o formulário: {resultado['mensagem_erro']}")
                         
                 except Exception as e:
                     st.error(f"❌ Erro durante a execução: {str(e)}")
@@ -246,10 +319,10 @@ def main():
     st.markdown("---")
     st.subheader("📦 Requisitos do Sistema")
     codigo_requisitos = """
-    streamlit
-    selenium
-    webdriver-manager
-    pandas
+    streamlit>=1.28.0
+    selenium>=4.15.0
+    webdriver-manager>=4.0.1
+    pandas>=2.1.3
     """
     st.code(codigo_requisitos, language="bash")
     
