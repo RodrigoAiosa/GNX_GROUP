@@ -1,0 +1,20 @@
+Profissional com expertise em Python para automação de processos e análise de dados, transformando tarefas repetitivas em soluções eficientes.
+Especialista em SQL com capacidade de extrair, manipular e analisar grandes volumes de dados para tomada de decisão estratégica.
+Domínio avançado em Power BI para criação de dashboards interativos e relatórios gerenciais de alto impacto.
+Ampla experiência em Excel, incluindo fórmulas avançadas, macros e VBA para otimização de planilhas complexas.
+Especialista em automação de processos com Python, reduzindo tempo de execução de tarefas em até 70%.
+Profissional de Business Intelligence com foco em transformar dados em insights acionáveis para o negócio.
+Experiência em integração de sistemas utilizando Python e APIs para automação de fluxos de trabalho.
+Criação de soluções em Power BI que facilitam a visualização e monitoramento de KPIs críticos.
+Especialista em otimização de bancos de dados SQL, garantindo performance e integridade dos dados.
+Desenvolvimento de automações em Python para web scraping, extração e processamento de dados estruturados.
+Habilidade em criar modelos preditivos e análises estatísticas utilizando Python e bibliotecas como Pandas e NumPy.
+Criação de relatórios automatizados em Excel com VBA, reduzindo erros manuais e aumentando a produtividade.
+Experiência em implementação de soluções de BI com Power BI e SQL para suporte à alta gestão.
+Especialista em automação de e-mails e relatórios com Python, otimizando a comunicação interna.
+Desenvolvimento de dashboards em Power BI com atualização automática via APIs e bancos de dados.
+Profissional com forte capacidade analítica e resolução de problemas complexos usando Python.
+Automação de planilhas Excel com Python, permitindo processamento massivo de dados com eficiência.
+Criação de pipelines de dados usando SQL e Python para ETL (Extract, Transform, Load).
+Especialista em visualização de dados com Power BI, criando narrativas visuais que impulsionam decisões.
+Combinação de habilidades em Python, SQL, Power BI e Excel para soluções completas em dados e automação.
