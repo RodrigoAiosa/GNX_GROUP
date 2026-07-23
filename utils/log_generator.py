@@ -1,10 +1,17 @@
 from datetime import datetime
 import os
+import pytz
 
 def gerar_arquivo_log_tabela(dados_envio, status_envio, mensagem_retorno=""):
     """Gera um arquivo de log com colunas separadas por ;"""
-    data_hora = datetime.now().strftime("%Y%m%d_%H%M%S")
-    data_hora_formatada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Definir fuso horário Brasil/São Paulo
+    fuso_sp = pytz.timezone('America/Sao_Paulo')
+    
+    # Obter data/hora atual com fuso SP
+    agora = datetime.now(fuso_sp)
+    data_hora = agora.strftime("%Y%m%d_%H%M%S")
+    data_hora_formatada = agora.strftime("%Y-%m-%d %H:%M:%S")
     
     nome_arquivo_txt = f"log_envio_{data_hora}.log"
     
