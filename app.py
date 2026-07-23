@@ -11,6 +11,7 @@ from utils.data_manager import (
 from datetime import datetime
 import os
 import time
+import sys
 
 # Configuração da página
 st.set_page_config(
@@ -39,6 +40,14 @@ frases = carregar_frases()
 departamentos = carregar_departamentos()
 segmentos = carregar_segmentos()
 
+def verificar_selenium():
+    """Verifica se o Selenium está disponível"""
+    try:
+        import selenium
+        return True
+    except ImportError:
+        return False
+
 def main():
     # Sidebar para configurações
     st.sidebar.header("⚙️ Configurações")
@@ -57,7 +66,7 @@ def main():
     num_execucoes = st.sidebar.number_input(
         "Número de execuções:",
         min_value=1,
-        max_value=100,
+        max_value=50,
         value=1,
         step=1,
         help="Quantas vezes o formulário será preenchido"
@@ -65,18 +74,26 @@ def main():
     
     # Modo de visualização
     st.sidebar.subheader("👁️ Modo de Visualização")
-    modo_visualizacao = st.sidebar.radio(
-        "Selecione o modo:",
-        ["📡 API (rápido, sem navegador)", "🌐 Navegador (ver preenchimento)"],
-        index=0,
-        help="API: mais rápido, sem abrir navegador. Navegador: mostra o preenchimento em tempo real"
-    )
+    
+    # Verificar se Selenium está disponível
+    selenium_disponivel = verificar_selenium()
+    
+    if not selenium_disponivel:
+        st.sidebar.warning("⚠️ Selenium não está instalado. Modo navegador indisponível.")
+        modo_visualizacao = "API (rápido, sem navegador)"
+    else:
+        modo_visualizacao = st.sidebar.radio(
+            "Selecione o modo:",
+            ["API (rápido, sem navegador)", "Navegador (ver preenchimento)"],
+            index=0,
+            help="API: mais rápido, sem abrir navegador. Navegador: mostra o preenchimento em tempo real"
+        )
     
     # Tempo entre execuções
     if num_execucoes > 1:
         tempo_entre = st.sidebar.slider(
             "Tempo entre execuções (segundos):",
-            min_value=1,
+            min_value=2,
             max_value=30,
             value=5,
             step=1,
@@ -93,15 +110,9 @@ def main():
             # Verificar se é modo navegador
             usar_selenium = "Navegador" in modo_visualizacao
             
-            if usar_selenium:
-                # Verificar se o Chrome está disponível
-                try:
-                    from selenium import webdriver
-                    from selenium.webdriver.chrome.options import Options
-                    st.info("🌐 Modo navegador selecionado - O Chrome será aberto para visualização")
-                except ImportError:
-                    st.error("❌ Selenium não está instalado. Execute: pip install selenium webdriver-manager")
-                    st.stop()
+            if usar_selenium and not selenium_disponivel:
+                st.error("❌ Selenium não está instalado. Instale com: pip install selenium webdriver-manager")
+                st.stop()
             
             # Container para os resultados
             resultados_container = st.container()
@@ -117,6 +128,7 @@ def main():
                 todos_logs = []
                 execucoes_sucesso = 0
                 execucoes_erro = 0
+                detalhes_execucoes = []
                 
                 for i in range(num_execucoes):
                     status_text.text(f"🔄 Execução {i+1} de {num_execucoes}")
@@ -129,6 +141,7 @@ def main():
                     try:
                         if usar_selenium:
                             # Modo com Selenium (visual)
+                            st.info(f"🌐 Abrindo navegador para execução {i+1}...")
                             resultado = preencher_formulario_selenium(
                                 nome, 
                                 email, 
@@ -152,33 +165,51 @@ def main():
                         
                         if resultado["status"] == "sucesso":
                             execucoes_sucesso += 1
+                            detalhes_execucoes.append({
+                                "execucao": i+1,
+                                "status": "✅ SUCESSO",
+                                "departamento": departamento,
+                                "segmento": segmento,
+                                "mensagem": mensagem[:100] + "..."
+                            })
+                            
                             if "log_txt" in resultado:
                                 log_path = os.path.join('logs', resultado["log_txt"])
                                 if os.path.exists(log_path):
                                     with open(log_path, 'r', encoding='utf-8') as f:
                                         log_content = f.read()
-                                    todos_logs.append({
-                                        "execucao": i+1,
-                                        "status": "✅ SUCESSO",
-                                        "departamento": departamento,
-                                        "segmento": segmento,
-                                        "log": log_content
-                                    })
+                                    todos_logs.append(log_content)
                             
                             # Mostrar no log de execução
-                            with st.expander(f"📋 Execução {i+1} - SUCESSO", expanded=(i==0)):
+                            with st.expander(f"✅ Execução {i+1} - SUCESSO", expanded=(i==0 and num_execucoes<=3)):
                                 st.success(f"✅ Formulário enviado com sucesso!")
                                 st.write(f"**Departamento:** {departamento}")
                                 st.write(f"**Segmento:** {segmento}")
-                                st.write(f"**Mensagem:** {mensagem[:100]}...")
+                                st.write(f"**Mensagem:** {mensagem[:150]}...")
+                                if "detalhe" in resultado:
+                                    st.info(f"ℹ️ {resultado['detalhe']}")
                         else:
                             execucoes_erro += 1
-                            with st.expander(f"❌ Execução {i+1} - ERRO", expanded=(i==0)):
+                            detalhes_execucoes.append({
+                                "execucao": i+1,
+                                "status": "❌ ERRO",
+                                "departamento": departamento,
+                                "segmento": segmento,
+                                "mensagem": "Erro no envio"
+                            })
+                            with st.expander(f"❌ Execução {i+1} - ERRO", expanded=(i==0 and num_execucoes<=3)):
                                 st.error(f"❌ Erro: {resultado.get('mensagem_erro', 'Erro desconhecido')}")
                     
                     except Exception as e:
                         execucoes_erro += 1
-                        with st.expander(f"❌ Execução {i+1} - ERRO", expanded=(i==0)):
+                        detalhes_execucoes.append({
+                            "execucao": i+1,
+                            "status": "❌ ERRO",
+                            "departamento": departamento,
+                            "segmento": segmento,
+                            "mensagem": str(e)[:100]
+                        })
+                        with st.expander(f"❌ Execução {i+1} - ERRO", expanded=(i==0 and num_execucoes<=3)):
                             st.error(f"❌ Erro inesperado: {str(e)}")
                     
                     # Atualizar barra de progresso
@@ -199,9 +230,36 @@ def main():
                 with col1:
                     st.metric("📦 Total de Execuções", num_execucoes)
                 with col2:
-                    st.metric("✅ Sucessos", execucoes_sucesso, delta=f"{execucoes_sucesso/num_execucoes*100:.0f}%")
+                    taxa_sucesso = (execucoes_sucesso / num_execucoes * 100) if num_execucoes > 0 else 0
+                    st.metric("✅ Sucessos", execucoes_sucesso, delta=f"{taxa_sucesso:.0f}%")
                 with col3:
-                    st.metric("❌ Erros", execucoes_erro, delta=f"{execucoes_erro/num_execucoes*100:.0f}%")
+                    taxa_erro = (execucoes_erro / num_execucoes * 100) if num_execucoes > 0 else 0
+                    st.metric("❌ Erros", execucoes_erro, delta=f"{taxa_erro:.0f}%")
+                
+                # Tabela de detalhes
+                if detalhes_execucoes:
+                    st.markdown("---")
+                    st.subheader("📋 Detalhes das Execuções")
+                    
+                    # Criar tabela
+                    dados_tabela = []
+                    for det in detalhes_execucoes:
+                        dados_tabela.append([
+                            det["execucao"],
+                            det["status"],
+                            det["departamento"],
+                            det["segmento"],
+                            det["mensagem"]
+                        ])
+                    
+                    # Mostrar como tabela
+                    st.table({
+                        "Execução": [d[0] for d in dados_tabela],
+                        "Status": [d[1] for d in dados_tabela],
+                        "Departamento": [d[2] for d in dados_tabela],
+                        "Segmento": [d[3] for d in dados_tabela],
+                        "Mensagem": [d[4] for d in dados_tabela]
+                    })
                 
                 # Gerar arquivo consolidado com todos os logs
                 if todos_logs and num_execucoes > 1:
@@ -212,21 +270,15 @@ def main():
                     data_hora = datetime.now().strftime("%Y%m%d_%H%M%S")
                     nome_consolidado = f"log_consolidado_{data_hora}.log"
                     
-                    with open(nome_consolidado, 'w', encoding='utf-8') as f:
-                        # Cabeçalho
-                        f.write("Data/Hora do Envio;Status;Nome;Email;Telefone;Empresa;Departamento;Segmento;Mensagem\n")
-                        
-                        # Para cada execução, adicionar uma linha
-                        for log_info in todos_logs:
-                            # Extrair dados do log
-                            linhas = log_info["log"].strip().split('\n')
-                            if len(linhas) > 1:
-                                # Pular cabeçalho e pegar dados
-                                dados_linha = linhas[1] if len(linhas) > 1 else ""
-                                f.write(dados_linha + "\n")
-                    
-                    with open(nome_consolidado, 'r', encoding='utf-8') as f:
-                        conteudo_consolidado = f.read()
+                    # Criar conteúdo consolidado
+                    conteudo_consolidado = "Data/Hora do Envio;Status;Nome;Email;Telefone;Empresa;Departamento;Segmento;Mensagem\n"
+                    for log in todos_logs:
+                        linhas = log.strip().split('\n')
+                        if len(linhas) > 1:
+                            # Pular cabeçalho e pegar dados
+                            dados_linha = linhas[1] if len(linhas) > 1 else ""
+                            if dados_linha:
+                                conteudo_consolidado += dados_linha + "\n"
                     
                     st.download_button(
                         label="📥 Baixar Log Consolidado (Todas as execuções)",
@@ -240,7 +292,17 @@ def main():
                     with st.expander("📋 Prévia do Log Consolidado"):
                         st.code(conteudo_consolidado[:500] + ("..." if len(conteudo_consolidado) > 500 else ""))
                 
-                st.balloons()
+                # Se apenas uma execução, mostrar o log individual
+                elif todos_logs and num_execucoes == 1:
+                    st.markdown("---")
+                    st.subheader("📄 Log da Execução")
+                    
+                    # Mostrar o log
+                    with st.expander("📋 Ver Log", expanded=True):
+                        st.code(todos_logs[0])
+                
+                if execucoes_sucesso > 0:
+                    st.balloons()
     
     # Botão para gerar uma frase aleatória
     st.sidebar.markdown("---")
@@ -270,6 +332,17 @@ def main():
         st.metric("🏢 Total de Segmentos", len(segmentos), delta="opções")
     with col3:
         st.metric("💬 Total de Frases", len(frases), delta="variações")
+    
+    # Status do Selenium
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    with col1:
+        if verificar_selenium():
+            st.success("✅ Selenium disponível - Modo navegador habilitado")
+        else:
+            st.warning("⚠️ Selenium não disponível - Use apenas modo API")
+    with col2:
+        st.info(f"📁 Logs salvos em: ./logs/")
     
     st.caption("Desenvolvido com ❤️ usando Python, Requests e Streamlit")
 
