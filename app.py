@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.form_handler import preencher_formulario_api
+from utils.form_handler import preencher_formulario_api, URL_FORMULARIO
 from utils.data_manager import (
     carregar_frases,
     carregar_departamentos,
@@ -31,7 +31,7 @@ def load_css():
 load_css()
 
 # Título do app
-st.title("🤖 Automação de Formulário - GNX Group")
+st.title("🤖 Automação GNX Group")
 st.markdown("---")
 
 # Inicializar dados
@@ -265,13 +265,16 @@ def main():
     
     # Informações adicionais
     st.sidebar.markdown("---")
-    st.sidebar.info("""
+    st.sidebar.info(f"""
     **Como funciona:**
     1. Preencha seus dados
     2. Configure o número de execuções
     3. Clique em "Executar Automação"
     4. Acompanhe o progresso em tempo real
     5. Baixe os logs gerados
+    
+    **Site alvo:**
+    {URL_FORMULARIO}
     """)
     
     # Estatísticas
@@ -287,6 +290,7 @@ def main():
     
     st.markdown("---")
     st.info(f"📁 Logs salvos em: ./logs/")
+    st.info(f"🌐 Site automatizado: {URL_FORMULARIO}")
     
     st.caption("Desenvolvido com ❤️ usando Python, Requests e Streamlit")
 
