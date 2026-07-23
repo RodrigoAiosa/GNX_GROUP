@@ -34,8 +34,6 @@ def preencher_formulario_api(nome, email, telefone, empresa, departamento, segme
     try:
         url = "https://gnxgroup.com.br/solucoes/temporarios/"
         
-        st.info("🌐 Acessando o site para obter o token...")
-        
         headers_initial = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -49,8 +47,6 @@ def preencher_formulario_api(nome, email, telefone, empresa, departamento, segme
         response.raise_for_status()
         
         token = extrair_csrf_token(response.text)
-        
-        st.info("📝 Preparando dados do formulário...")
         
         form_data = {
             'form_fields[nome]': nome,
@@ -75,8 +71,6 @@ def preencher_formulario_api(nome, email, telefone, empresa, departamento, segme
             'Referer': url,
             'Connection': 'keep-alive',
         }
-        
-        st.info("📤 Enviando formulário...")
         
         dados_para_log = {
             'Nome': nome,
@@ -155,6 +149,7 @@ def preencher_formulario_api(nome, email, telefone, empresa, departamento, segme
 
 def preencher_formulario_selenium(nome, email, telefone, empresa, departamento, segmento, mensagem):
     """Preenche o formulário usando Selenium - Modo Visual"""
+    driver = None
     try:
         from selenium import webdriver
         from selenium.webdriver.common.by import By
@@ -164,20 +159,22 @@ def preencher_formulario_selenium(nome, email, telefone, empresa, departamento, 
         from selenium.webdriver.chrome.service import Service
         from webdriver_manager.chrome import ChromeDriverManager
         
-        st.info("🌐 Iniciando navegador para visualização...")
-        
         # Configurar Chrome
         chrome_options = Options()
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1280,1024")
-        # Remover headless para ver o navegador
-        # chrome_options.add_argument("--headless")  # Comentado para ver o navegador
+        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
         
         # Iniciar driver
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        # Injetar script para evitar detecção
+        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         
         st.info("🌐 Abrindo o site...")
         driver.get("https://gnxgroup.com.br/solucoes/temporarios/")
@@ -192,50 +189,47 @@ def preencher_formulario_selenium(nome, email, telefone, empresa, departamento, 
         nome_field = wait.until(EC.presence_of_element_located((By.XPATH, "//*[@id='form-field-nome']")))
         nome_field.clear()
         nome_field.send_keys(nome)
-        time.sleep(0.5)
+        time.sleep(0.3)
         
         # Preencher Email
         email_field = driver.find_element(By.XPATH, "//*[@id='form-field-email']")
         email_field.clear()
         email_field.send_keys(email)
-        time.sleep(0.5)
+        time.sleep(0.3)
         
         # Preencher Telefone
         telefone_field = driver.find_element(By.XPATH, "//*[@id='form-field-telefone']")
         telefone_field.clear()
         telefone_field.send_keys(telefone)
-        time.sleep(0.5)
+        time.sleep(0.3)
         
         # Preencher Empresa
         empresa_field = driver.find_element(By.XPATH, "//*[@id='form-field-empresa']")
         empresa_field.clear()
         empresa_field.send_keys(empresa)
-        time.sleep(0.5)
+        time.sleep(0.3)
         
         # Selecionar Departamento
-        st.info(f"📋 Selecionando departamento: {departamento}")
         departamento_select = driver.find_element(By.XPATH, "//*[@id='form-field-departamento']")
         for option in departamento_select.find_elements(By.TAG_NAME, "option"):
             if option.text == departamento:
                 option.click()
                 break
-        time.sleep(0.5)
+        time.sleep(0.3)
         
         # Selecionar Segmento
-        st.info(f"📋 Selecionando segmento: {segmento}")
         segmento_select = driver.find_element(By.XPATH, "//*[@id='form-field-segmento']")
         for option in segmento_select.find_elements(By.TAG_NAME, "option"):
             if option.text == segmento:
                 option.click()
                 break
-        time.sleep(0.5)
+        time.sleep(0.3)
         
         # Preencher Mensagem
-        st.info("💬 Preenchendo mensagem...")
         mensagem_field = driver.find_element(By.XPATH, "//*[@id='form-field-mensagem_profissional']")
         mensagem_field.clear()
         mensagem_field.send_keys(mensagem)
-        time.sleep(1)
+        time.sleep(0.5)
         
         # Clicar no botão de enviar
         st.info("📤 Enviando formulário...")
@@ -265,6 +259,7 @@ def preencher_formulario_selenium(nome, email, telefone, empresa, departamento, 
         
         # Fechar navegador
         driver.quit()
+        driver = None
         
         # Gerar log
         dados_para_log = {
@@ -289,10 +284,11 @@ def preencher_formulario_selenium(nome, email, telefone, empresa, departamento, 
         }
         
     except Exception as e:
-        try:
-            driver.quit()
-        except:
-            pass
+        if driver:
+            try:
+                driver.quit()
+            except:
+                pass
         return {
             "status": "erro",
             "mensagem_erro": f"Erro no Selenium: {str(e)}"
