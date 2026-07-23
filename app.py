@@ -1,268 +1,39 @@
 import streamlit as st
-import requests
-import random
-from bs4 import BeautifulSoup
-import re
-import time
+from utils.form_handler import preencher_formulario_api
+from utils.data_manager import (
+    carregar_frases,
+    carregar_departamentos,
+    carregar_segmentos,
+    get_random_frase,
+    get_random_departamento,
+    get_random_segmento
+)
 from datetime import datetime
-import json
 import os
 
-# Configuração da página Streamlit
+# Configuração da página
 st.set_page_config(
     page_title="Automação GNX Group",
     page_icon="🤖",
     layout="wide"
 )
 
+# Carregar CSS personalizado
+def load_css():
+    with open('static/style.css', 'r', encoding='utf-8') as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
+# Carregar CSS
+load_css()
+
 # Título do app
 st.title("🤖 Automação de Formulário - GNX Group")
 st.markdown("---")
 
-# Lista de frases sobre habilidades
-FRASES_HABILIDADES = [
-    "Profissional com expertise em Python para automação de processos e análise de dados, transformando tarefas repetitivas em soluções eficientes.",
-    "Especialista em SQL com capacidade de extrair, manipular e analisar grandes volumes de dados para tomada de decisão estratégica.",
-    "Domínio avançado em Power BI para criação de dashboards interativos e relatórios gerenciais de alto impacto.",
-    "Ampla experiência em Excel, incluindo fórmulas avançadas, macros e VBA para otimização de planilhas complexas.",
-    "Especialista em automação de processos com Python, reduzindo tempo de execução de tarefas em até 70%.",
-    "Profissional de Business Intelligence com foco em transformar dados em insights acionáveis para o negócio.",
-    "Experiência em integração de sistemas utilizando Python e APIs para automação de fluxos de trabalho.",
-    "Criação de soluções em Power BI que facilitam a visualização e monitoramento de KPIs críticos.",
-    "Especialista em otimização de bancos de dados SQL, garantindo performance e integridade dos dados.",
-    "Desenvolvimento de automações em Python para web scraping, extração e processamento de dados estruturados.",
-    "Habilidade em criar modelos preditivos e análises estatísticas utilizando Python e bibliotecas como Pandas e NumPy.",
-    "Criação de relatórios automatizados em Excel com VBA, reduzindo erros manuais e aumentando a produtividade.",
-    "Experiência em implementação de soluções de BI com Power BI e SQL para suporte à alta gestão.",
-    "Especialista em automação de e-mails e relatórios com Python, otimizando a comunicação interna.",
-    "Desenvolvimento de dashboards em Power BI com atualização automática via APIs e bancos de dados.",
-    "Profissional com forte capacidade analítica e resolução de problemas complexos usando Python.",
-    "Automação de planilhas Excel com Python, permitindo processamento massivo de dados com eficiência.",
-    "Criação de pipelines de dados usando SQL e Python para ETL (Extract, Transform, Load).",
-    "Especialista em visualização de dados com Power BI, criando narrativas visuais que impulsionam decisões.",
-    "Combinação de habilidades em Python, SQL, Power BI e Excel para soluções completas em dados e automação."
-]
-
-def get_random_departamento():
-    """Retorna um departamento aleatório"""
-    departamentos = [
-        "Recursos Humanos (RH)",
-        "Compras ou Suprimentos",
-        "Gerência Executiva",
-        "Marketing",
-        "Vendas",
-        "Trade Marketing",
-        "Desenvolvimento de Negócios",
-        "Outros"
-    ]
-    return random.choice(departamentos)
-
-def get_random_segmento():
-    """Retorna um segmento aleatório"""
-    segmentos = [
-        "Indústria",
-        "Logística e Transporte",
-        "Varejo",
-        "Setor de alimentos e restaurantes",
-        "Eventos e Entretenimento",
-        "Hotelaria e Turismo",
-        "Call Centers",
-        "Setor de saúde e bem-estar",
-        "Educação",
-        "Tecnologia da Informação",
-        "Serviços Financeiros",
-        "Outros"
-    ]
-    return random.choice(segmentos)
-
-def get_random_frase():
-    """Retorna uma frase aleatória sobre habilidades"""
-    return random.choice(FRASES_HABILIDADES)
-
-def extrair_csrf_token(html):
-    """Extrai o token CSRF do HTML da página"""
-    soup = BeautifulSoup(html, 'html.parser')
-    
-    token_input = soup.find('input', {'name': '_wpnonce'})
-    if token_input:
-        return token_input.get('value', '')
-    
-    token_input = soup.find('input', {'id': '_wpnonce'})
-    if token_input:
-        return token_input.get('value', '')
-    
-    token_input = soup.find('input', {'type': 'hidden', 'name': re.compile(r'nonce|_wpnonce', re.I)})
-    if token_input:
-        return token_input.get('value', '')
-    
-    script_pattern = r'var\s+nonce\s*=\s*[\'"]([^\'"]+)[\'"]'
-    script_match = re.search(script_pattern, html)
-    if script_match:
-        return script_match.group(1)
-    
-    return ''
-
-def gerar_arquivo_log_txt(dados_envio, status_envio, mensagem_retorno=""):
-    """Gera um arquivo de log TXT com os dados em formato de colunas"""
-    data_hora = datetime.now().strftime("%Y%m%d_%H%M%S")
-    data_hora_formatada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    # Nome do arquivo
-    nome_arquivo_txt = f"log_envio_{data_hora}.txt"
-    
-    # Gerar conteúdo do log em formato de colunas
-    with open(nome_arquivo_txt, 'w', encoding='utf-8') as f:
-        f.write("=" * 80 + "\n")
-        f.write("LOG DE ENVIO DE FORMULÁRIO - GNX GROUP\n")
-        f.write("=" * 80 + "\n\n")
-        f.write(f"Data/Hora do Envio: {data_hora_formatada}\n")
-        f.write(f"Timestamp UNIX: {int(time.time())}\n")
-        f.write(f"Status: {status_envio}\n")
-        if mensagem_retorno:
-            f.write(f"Mensagem: {mensagem_retorno}\n")
-        f.write("\n" + "-" * 80 + "\n")
-        f.write("DADOS ENVIADOS:\n")
-        f.write("-" * 80 + "\n\n")
-        
-        # Formato em colunas
-        for campo, valor in dados_envio.items():
-            f.write(f"{campo}: {valor}\n")
-        
-        f.write("\n" + "=" * 80 + "\n")
-        f.write("FIM DO LOG\n")
-        f.write("=" * 80 + "\n")
-    
-    return nome_arquivo_txt
-
-def preencher_formulario_api(nome, email, telefone, empresa):
-    """Preenche o formulário usando requests (POST direto)"""
-    try:
-        url = "https://gnxgroup.com.br/solucoes/temporarios/"
-        
-        st.info("🌐 Acessando o site para obter o token...")
-        
-        headers_initial = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-        }
-        
-        session = requests.Session()
-        response = session.get(url, headers=headers_initial)
-        response.raise_for_status()
-        
-        token = extrair_csrf_token(response.text)
-        
-        departamento = get_random_departamento()
-        segmento = get_random_segmento()
-        mensagem = get_random_frase()
-        
-        st.info("📝 Preparando dados do formulário...")
-        
-        form_data = {
-            'form_fields[nome]': nome,
-            'form_fields[email]': email,
-            'form_fields[telefone]': telefone,
-            'form_fields[empresa]': empresa,
-            'form_fields[departamento]': departamento,
-            'form_fields[segmento]': segmento,
-            'form_fields[mensagem_profissional]': mensagem,
-        }
-        
-        if token:
-            form_data['_wpnonce'] = token
-        
-        headers_post = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Origin': 'https://gnxgroup.com.br',
-            'Referer': url,
-            'Connection': 'keep-alive',
-        }
-        
-        st.info("📤 Enviando formulário...")
-        
-        dados_para_log = {
-            'Nome': nome,
-            'Email': email,
-            'Telefone': telefone,
-            'Empresa': empresa,
-            'Departamento': departamento,
-            'Segmento': segmento,
-            'Mensagem': mensagem,
-            'Token_CSRF': token if token else 'Não encontrado'
-        }
-        
-        post_response = session.post(
-            url,
-            data=form_data,
-            headers=headers_post,
-            allow_redirects=True
-        )
-        
-        if post_response.status_code == 200:
-            soup = BeautifulSoup(post_response.text, 'html.parser')
-            
-            success_messages = soup.find_all(['div', 'p', 'span'], 
-                                           text=re.compile(r'(sucesso|success|enviado|obrigado|agradecimento)', re.I))
-            
-            if success_messages:
-                mensagem_retorno = "Formulário enviado com sucesso!"
-                status_envio = "SUCESSO"
-            else:
-                mensagem_retorno = "Formulário enviado (verifique se recebeu o email de confirmação)"
-                status_envio = "ENVIADO"
-            
-            nome_txt = gerar_arquivo_log_txt(dados_para_log, status_envio, mensagem_retorno)
-            
-            return {
-                "status": "sucesso",
-                "departamento": departamento,
-                "segmento": segmento,
-                "mensagem": mensagem,
-                "detalhe": mensagem_retorno,
-                "log_txt": nome_txt
-            }
-        else:
-            mensagem_erro = f"Erro {post_response.status_code}: {post_response.text[:200]}"
-            nome_txt = gerar_arquivo_log_txt(dados_para_log, "ERRO", mensagem_erro)
-            
-            return {
-                "status": "erro",
-                "mensagem_erro": mensagem_erro,
-                "log_txt": nome_txt
-            }
-            
-    except requests.exceptions.RequestException as e:
-        dados_para_log = {
-            'Nome': nome,
-            'Email': email,
-            'Telefone': telefone,
-            'Empresa': empresa,
-            'Departamento': 'N/A',
-            'Segmento': 'N/A',
-            'Mensagem': 'N/A',
-            'Token_CSRF': 'N/A'
-        }
-        mensagem_erro = f"Erro de conexão: {str(e)}"
-        nome_txt = gerar_arquivo_log_txt(dados_para_log, "ERRO_CONEXAO", mensagem_erro)
-        
-        return {
-            "status": "erro",
-            "mensagem_erro": mensagem_erro,
-            "log_txt": nome_txt
-        }
-    except Exception as e:
-        mensagem_erro = f"Erro inesperado: {str(e)}"
-        return {
-            "status": "erro",
-            "mensagem_erro": mensagem_erro
-        }
+# Inicializar dados
+frases = carregar_frases()
+departamentos = carregar_departamentos()
+segmentos = carregar_segmentos()
 
 def main():
     # Sidebar para configurações
@@ -280,7 +51,15 @@ def main():
             st.error("⚠️ Por favor, preencha todos os campos!")
         else:
             with st.spinner("Executando automação... Aguarde!"):
-                resultado = preencher_formulario_api(nome, email, telefone, empresa)
+                resultado = preencher_formulario_api(
+                    nome, 
+                    email, 
+                    telefone, 
+                    empresa,
+                    get_random_departamento(departamentos),
+                    get_random_segmento(segmentos),
+                    get_random_frase(frases)
+                )
                 
                 if resultado["status"] == "sucesso":
                     st.success("✅ Formulário enviado com sucesso!")
@@ -296,7 +75,7 @@ def main():
                     with col2:
                         st.text_area("💬 Mensagem Enviada", resultado["mensagem"], height=150)
                     
-                    # Mostrar dados enviados em formato de colunas
+                    # Mostrar dados enviados
                     st.markdown("---")
                     st.subheader("📋 Dados Enviados")
                     
@@ -310,47 +89,63 @@ def main():
                         "Mensagem": resultado["mensagem"]
                     }
                     
-                    for campo, valor in dados_exibicao.items():
-                        st.write(f"**{campo}:** {valor}")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"**Nome:** {dados_exibicao['Nome']}")
+                        st.write(f"**Email:** {dados_exibicao['Email']}")
+                        st.write(f"**Telefone:** {dados_exibicao['Telefone']}")
+                        st.write(f"**Empresa:** {dados_exibicao['Empresa']}")
+                    with col2:
+                        st.write(f"**Departamento:** {dados_exibicao['Departamento']}")
+                        st.write(f"**Segmento:** {dados_exibicao['Segmento']}")
+                        st.write(f"**Mensagem:** {dados_exibicao['Mensagem'][:100]}...")
                     
-                    # Botão para download do log TXT
+                    # Botão para download do log
                     if "log_txt" in resultado:
                         st.markdown("---")
-                        with open(resultado["log_txt"], 'r', encoding='utf-8') as f:
-                            txt_content = f.read()
-                        st.download_button(
-                            label="📥 Baixar Log (TXT)",
-                            data=txt_content,
-                            file_name=resultado["log_txt"],
-                            mime="text/plain",
-                            use_container_width=True
-                        )
+                        log_path = os.path.join('logs', resultado["log_txt"])
+                        
+                        if os.path.exists(log_path):
+                            with open(log_path, 'r', encoding='utf-8') as f:
+                                txt_content = f.read()
+                            
+                            st.text_area("📄 Prévia do Log", txt_content, height=200)
+                            
+                            st.download_button(
+                                label="📥 Baixar Log (TXT)",
+                                data=txt_content,
+                                file_name=resultado["log_txt"],
+                                mime="text/plain",
+                                use_container_width=True
+                            )
                     
                     st.balloons()
                 else:
                     st.error(f"❌ Erro ao enviar formulário: {resultado['mensagem_erro']}")
                     
-                    # Mostrar log mesmo em caso de erro
                     if "log_txt" in resultado:
                         st.markdown("---")
                         st.subheader("📄 Log de Erro")
-                        with open(resultado["log_txt"], 'r', encoding='utf-8') as f:
-                            txt_content = f.read()
-                        st.text_area("Conteúdo do Log", txt_content, height=200)
+                        log_path = os.path.join('logs', resultado["log_txt"])
                         
-                        st.download_button(
-                            label="📥 Baixar Log de Erro (TXT)",
-                            data=txt_content,
-                            file_name=resultado["log_txt"],
-                            mime="text/plain",
-                            use_container_width=True
-                        )
+                        if os.path.exists(log_path):
+                            with open(log_path, 'r', encoding='utf-8') as f:
+                                txt_content = f.read()
+                            st.text_area("Conteúdo do Log", txt_content, height=200)
+                            
+                            st.download_button(
+                                label="📥 Baixar Log de Erro (TXT)",
+                                data=txt_content,
+                                file_name=resultado["log_txt"],
+                                mime="text/plain",
+                                use_container_width=True
+                            )
     
     # Botão para gerar uma frase aleatória
     st.sidebar.markdown("---")
     st.sidebar.subheader("📝 Gerador de Frases")
     if st.sidebar.button("🔄 Gerar Frase Aleatória"):
-        frase = get_random_frase()
+        frase = get_random_frase(frases)
         st.sidebar.info(frase)
     
     # Informações adicionais
@@ -361,21 +156,23 @@ def main():
     2. Clique em "Executar Automação"
     3. O sistema preencherá automaticamente o formulário
     4. Os campos 'Departamento' e 'Segmento' são sorteados aleatoriamente
-    5. Um arquivo de log TXT é gerado com todos os dados enviados
+    5. Um arquivo de log em formato de tabela é gerado
     """)
     
-    # Área principal - Estatísticas
+    # Estatísticas
     st.header("📊 Sobre a Automação")
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("🏷️ Total de Departamentos", "8", delta="opções")
+        st.metric("🏷️ Total de Departamentos", len(departamentos), delta="opções")
     with col2:
-        st.metric("🏢 Total de Segmentos", "12", delta="opções")
+        st.metric("🏢 Total de Segmentos", len(segmentos), delta="opções")
     with col3:
-        st.metric("💬 Total de Frases", f"{len(FRASES_HABILIDADES)}", delta="variações")
+        st.metric("💬 Total de Frases", len(frases), delta="variações")
     
     st.caption("Desenvolvido com ❤️ usando Python, Requests e Streamlit")
 
 if __name__ == "__main__":
+    # Criar diretórios necessários
+    os.makedirs('logs', exist_ok=True)
     main()
