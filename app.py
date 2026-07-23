@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.form_handler import preencher_formulario_api, preencher_formulario_selenium
+from utils.form_handler import preencher_formulario_api
 from utils.data_manager import (
     carregar_frases,
     carregar_departamentos,
@@ -11,7 +11,6 @@ from utils.data_manager import (
 from datetime import datetime
 import os
 import time
-import sys
 
 # Configuração da página
 st.set_page_config(
@@ -40,14 +39,6 @@ frases = carregar_frases()
 departamentos = carregar_departamentos()
 segmentos = carregar_segmentos()
 
-def verificar_selenium():
-    """Verifica se o Selenium está disponível"""
-    try:
-        import selenium
-        return True
-    except ImportError:
-        return False
-
 def main():
     # Sidebar para configurações
     st.sidebar.header("⚙️ Configurações")
@@ -72,23 +63,6 @@ def main():
         help="Quantas vezes o formulário será preenchido"
     )
     
-    # Modo de visualização
-    st.sidebar.subheader("👁️ Modo de Visualização")
-    
-    # Verificar se Selenium está disponível
-    selenium_disponivel = verificar_selenium()
-    
-    if not selenium_disponivel:
-        st.sidebar.warning("⚠️ Selenium não está instalado. Modo navegador indisponível.")
-        modo_visualizacao = "API (rápido, sem navegador)"
-    else:
-        modo_visualizacao = st.sidebar.radio(
-            "Selecione o modo:",
-            ["API (rápido, sem navegador)", "Navegador (ver preenchimento)"],
-            index=0,
-            help="API: mais rápido, sem abrir navegador. Navegador: mostra o preenchimento em tempo real"
-        )
-    
     # Tempo entre execuções
     if num_execucoes > 1:
         tempo_entre = st.sidebar.slider(
@@ -107,13 +81,6 @@ def main():
         if not nome or not email or not telefone or not empresa:
             st.error("⚠️ Por favor, preencha todos os campos!")
         else:
-            # Verificar se é modo navegador
-            usar_selenium = "Navegador" in modo_visualizacao
-            
-            if usar_selenium and not selenium_disponivel:
-                st.error("❌ Selenium não está instalado. Instale com: pip install selenium webdriver-manager")
-                st.stop()
-            
             # Container para os resultados
             resultados_container = st.container()
             
@@ -139,29 +106,16 @@ def main():
                     mensagem = get_random_frase(frases)
                     
                     try:
-                        if usar_selenium:
-                            # Modo com Selenium (visual)
-                            st.info(f"🌐 Abrindo navegador para execução {i+1}...")
-                            resultado = preencher_formulario_selenium(
-                                nome, 
-                                email, 
-                                telefone, 
-                                empresa,
-                                departamento,
-                                segmento,
-                                mensagem
-                            )
-                        else:
-                            # Modo API (rápido)
-                            resultado = preencher_formulario_api(
-                                nome, 
-                                email, 
-                                telefone, 
-                                empresa,
-                                departamento,
-                                segmento,
-                                mensagem
-                            )
+                        # Modo API (rápido)
+                        resultado = preencher_formulario_api(
+                            nome, 
+                            email, 
+                            telefone, 
+                            empresa,
+                            departamento,
+                            segmento,
+                            mensagem
+                        )
                         
                         if resultado["status"] == "sucesso":
                             execucoes_sucesso += 1
@@ -275,7 +229,6 @@ def main():
                     for log in todos_logs:
                         linhas = log.strip().split('\n')
                         if len(linhas) > 1:
-                            # Pular cabeçalho e pegar dados
                             dados_linha = linhas[1] if len(linhas) > 1 else ""
                             if dados_linha:
                                 conteudo_consolidado += dados_linha + "\n"
@@ -297,7 +250,6 @@ def main():
                     st.markdown("---")
                     st.subheader("📄 Log da Execução")
                     
-                    # Mostrar o log
                     with st.expander("📋 Ver Log", expanded=True):
                         st.code(todos_logs[0])
                 
@@ -317,9 +269,9 @@ def main():
     **Como funciona:**
     1. Preencha seus dados
     2. Configure o número de execuções
-    3. Escolha o modo (API ou Navegador)
-    4. Clique em "Executar Automação"
-    5. Acompanhe o progresso em tempo real
+    3. Clique em "Executar Automação"
+    4. Acompanhe o progresso em tempo real
+    5. Baixe os logs gerados
     """)
     
     # Estatísticas
@@ -333,16 +285,8 @@ def main():
     with col3:
         st.metric("💬 Total de Frases", len(frases), delta="variações")
     
-    # Status do Selenium
     st.markdown("---")
-    col1, col2 = st.columns(2)
-    with col1:
-        if verificar_selenium():
-            st.success("✅ Selenium disponível - Modo navegador habilitado")
-        else:
-            st.warning("⚠️ Selenium não disponível - Use apenas modo API")
-    with col2:
-        st.info(f"📁 Logs salvos em: ./logs/")
+    st.info(f"📁 Logs salvos em: ./logs/")
     
     st.caption("Desenvolvido com ❤️ usando Python, Requests e Streamlit")
 
