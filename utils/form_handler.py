@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import re
 from .log_generator import gerar_arquivo_log_tabela
 import os
+import time
 
 def extrair_csrf_token(html):
     """Extrai o token CSRF do HTML da página"""
@@ -29,7 +30,7 @@ def extrair_csrf_token(html):
     return ''
 
 def preencher_formulario_api(nome, email, telefone, empresa, departamento, segmento, mensagem):
-    """Preenche o formulário usando requests (POST direto)"""
+    """Preenche o formulário usando requests (POST direto) - Modo API"""
     try:
         url = "https://gnxgroup.com.br/solucoes/temporarios/"
         
@@ -150,4 +151,149 @@ def preencher_formulario_api(nome, email, telefone, empresa, departamento, segme
         return {
             "status": "erro",
             "mensagem_erro": mensagem_erro
+        }
+
+def preencher_formulario_selenium(nome, email, telefone, empresa, departamento, segmento, mensagem):
+    """Preenche o formulário usando Selenium - Modo Visual"""
+    try:
+        from selenium import webdriver
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.chrome.service import Service
+        from webdriver_manager.chrome import ChromeDriverManager
+        
+        st.info("🌐 Iniciando navegador para visualização...")
+        
+        # Configurar Chrome
+        chrome_options = Options()
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--window-size=1280,1024")
+        # Remover headless para ver o navegador
+        # chrome_options.add_argument("--headless")  # Comentado para ver o navegador
+        
+        # Iniciar driver
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        st.info("🌐 Abrindo o site...")
+        driver.get("https://gnxgroup.com.br/solucoes/temporarios/")
+        time.sleep(3)
+        
+        # Aguardar elementos
+        wait = WebDriverWait(driver, 15)
+        
+        st.info("📝 Preenchendo o formulário...")
+        
+        # Preencher Nome
+        nome_field = wait.until(EC.presence_of_element_located((By.XPATH, "//*[@id='form-field-nome']")))
+        nome_field.clear()
+        nome_field.send_keys(nome)
+        time.sleep(0.5)
+        
+        # Preencher Email
+        email_field = driver.find_element(By.XPATH, "//*[@id='form-field-email']")
+        email_field.clear()
+        email_field.send_keys(email)
+        time.sleep(0.5)
+        
+        # Preencher Telefone
+        telefone_field = driver.find_element(By.XPATH, "//*[@id='form-field-telefone']")
+        telefone_field.clear()
+        telefone_field.send_keys(telefone)
+        time.sleep(0.5)
+        
+        # Preencher Empresa
+        empresa_field = driver.find_element(By.XPATH, "//*[@id='form-field-empresa']")
+        empresa_field.clear()
+        empresa_field.send_keys(empresa)
+        time.sleep(0.5)
+        
+        # Selecionar Departamento
+        st.info(f"📋 Selecionando departamento: {departamento}")
+        departamento_select = driver.find_element(By.XPATH, "//*[@id='form-field-departamento']")
+        for option in departamento_select.find_elements(By.TAG_NAME, "option"):
+            if option.text == departamento:
+                option.click()
+                break
+        time.sleep(0.5)
+        
+        # Selecionar Segmento
+        st.info(f"📋 Selecionando segmento: {segmento}")
+        segmento_select = driver.find_element(By.XPATH, "//*[@id='form-field-segmento']")
+        for option in segmento_select.find_elements(By.TAG_NAME, "option"):
+            if option.text == segmento:
+                option.click()
+                break
+        time.sleep(0.5)
+        
+        # Preencher Mensagem
+        st.info("💬 Preenchendo mensagem...")
+        mensagem_field = driver.find_element(By.XPATH, "//*[@id='form-field-mensagem_profissional']")
+        mensagem_field.clear()
+        mensagem_field.send_keys(mensagem)
+        time.sleep(1)
+        
+        # Clicar no botão de enviar
+        st.info("📤 Enviando formulário...")
+        try:
+            submit_button = driver.find_element(By.XPATH, "//*[@id='contato']/div/div[2]/div[1]/div[2]/div/form/div/div[9]/button")
+            submit_button.click()
+            time.sleep(3)
+        except:
+            # Tentar encontrar o botão de outra forma
+            submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
+            submit_button.click()
+            time.sleep(3)
+        
+        # Verificar se foi enviado
+        page_source = driver.page_source
+        soup = BeautifulSoup(page_source, 'html.parser')
+        
+        success_messages = soup.find_all(['div', 'p', 'span'], 
+                                       text=re.compile(r'(sucesso|success|enviado|obrigado|agradecimento)', re.I))
+        
+        if success_messages:
+            mensagem_retorno = "Formulário enviado com sucesso!"
+            status_envio = "SUCESSO"
+        else:
+            mensagem_retorno = "Formulário enviado (verifique se recebeu o email de confirmação)"
+            status_envio = "ENVIADO"
+        
+        # Fechar navegador
+        driver.quit()
+        
+        # Gerar log
+        dados_para_log = {
+            'Nome': nome,
+            'Email': email,
+            'Telefone': telefone,
+            'Empresa': empresa,
+            'Departamento': departamento,
+            'Segmento': segmento,
+            'Mensagem': mensagem
+        }
+        
+        nome_log = gerar_arquivo_log_tabela(dados_para_log, status_envio, mensagem_retorno)
+        
+        return {
+            "status": "sucesso",
+            "departamento": departamento,
+            "segmento": segmento,
+            "mensagem": mensagem,
+            "detalhe": mensagem_retorno,
+            "log_txt": nome_log
+        }
+        
+    except Exception as e:
+        try:
+            driver.quit()
+        except:
+            pass
+        return {
+            "status": "erro",
+            "mensagem_erro": f"Erro no Selenium: {str(e)}"
         }
