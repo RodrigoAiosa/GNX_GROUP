@@ -107,7 +107,7 @@ def preencher_formulario_api(nome, email, telefone, empresa, departamento, segme
                 mensagem_retorno = "Formulário enviado (verifique se recebeu o email de confirmação)"
                 status_envio = "ENVIADO"
             
-            nome_txt = gerar_arquivo_log_tabela(dados_para_log, status_envio, mensagem_retorno)
+            nome_log = gerar_arquivo_log_tabela(dados_para_log, status_envio, mensagem_retorno)
             
             return {
                 "status": "sucesso",
@@ -115,16 +115,16 @@ def preencher_formulario_api(nome, email, telefone, empresa, departamento, segme
                 "segmento": segmento,
                 "mensagem": mensagem,
                 "detalhe": mensagem_retorno,
-                "log_txt": nome_txt
+                "log_txt": nome_log
             }
         else:
             mensagem_erro = f"Erro {post_response.status_code}: {post_response.text[:200]}"
-            nome_txt = gerar_arquivo_log_tabela(dados_para_log, "ERRO", mensagem_erro)
+            nome_log = gerar_arquivo_log_tabela(dados_para_log, "ERRO", mensagem_erro)
             
             return {
                 "status": "erro",
                 "mensagem_erro": mensagem_erro,
-                "log_txt": nome_txt
+                "log_txt": nome_log
             }
             
     except requests.exceptions.RequestException as e:
@@ -138,12 +138,12 @@ def preencher_formulario_api(nome, email, telefone, empresa, departamento, segme
             'Mensagem': 'N/A'
         }
         mensagem_erro = f"Erro de conexão: {str(e)}"
-        nome_txt = gerar_arquivo_log_tabela(dados_para_log, "ERRO_CONEXAO", mensagem_erro)
+        nome_log = gerar_arquivo_log_tabela(dados_para_log, "ERRO_CONEXAO", mensagem_erro)
         
         return {
             "status": "erro",
             "mensagem_erro": mensagem_erro,
-            "log_txt": nome_txt
+            "log_txt": nome_log
         }
     except Exception as e:
         mensagem_erro = f"Erro inesperado: {str(e)}"
