@@ -1,17 +1,9 @@
 import streamlit as st
-import time
+import requests
 import random
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-import pandas as pd
-import os
-import subprocess
-import sys
+from bs4 import BeautifulSoup
+import re
+import time
 
 # Configuração da página Streamlit
 st.set_page_config(
@@ -84,150 +76,144 @@ def get_random_frase():
     """Retorna uma frase aleatória sobre habilidades"""
     return random.choice(FRASES_HABILIDADES)
 
-def install_chrome():
-    """Instala o Chrome no ambiente do Streamlit Cloud"""
-    try:
-        # Verifica se o Chrome já está instalado
-        result = subprocess.run(['google-chrome', '--version'], capture_output=True, text=True)
-        if result.returncode == 0:
-            st.info("✅ Chrome já está instalado")
-            return True
-    except:
-        pass
+def extrair_csrf_token(html):
+    """Extrai o token CSRF do HTML da página"""
+    # Procura por input hidden com name '_wpnonce' ou similar
+    soup = BeautifulSoup(html, 'html.parser')
     
-    try:
-        st.info("📦 Instalando Chrome...")
-        # Para sistemas Linux (Ubuntu/Debian)
-        subprocess.run(['apt-get', 'update'], check=True, capture_output=True)
-        subprocess.run(['apt-get', 'install', '-y', 'wget', 'unzip'], check=True, capture_output=True)
-        
-        # Baixa e instala o Chrome
-        subprocess.run(['wget', '-q', 'https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb'], check=True)
-        subprocess.run(['dpkg', '-i', 'google-chrome-stable_current_amd64.deb'], check=True, capture_output=True)
-        subprocess.run(['apt-get', 'install', '-f', '-y'], check=True, capture_output=True)
-        
-        # Limpa o arquivo .deb
-        subprocess.run(['rm', 'google-chrome-stable_current_amd64.deb'], check=True)
-        
-        st.success("✅ Chrome instalado com sucesso!")
-        return True
-    except Exception as e:
-        st.error(f"❌ Erro ao instalar Chrome: {str(e)}")
-        return False
+    # Tenta encontrar o token CSRF
+    token_input = soup.find('input', {'name': '_wpnonce'})
+    if token_input:
+        return token_input.get('value', '')
+    
+    # Tenta encontrar no formato mais comum do Elementor
+    token_input = soup.find('input', {'id': '_wpnonce'})
+    if token_input:
+        return token_input.get('value', '')
+    
+    # Procura por qualquer input hidden com nonce
+    token_input = soup.find('input', {'type': 'hidden', 'name': re.compile(r'nonce|_wpnonce', re.I)})
+    if token_input:
+        return token_input.get('value', '')
+    
+    # Se não encontrar, tenta extrair do JavaScript
+    script_pattern = r'var\s+nonce\s*=\s*[\'"]([^\'"]+)[\'"]'
+    script_match = re.search(script_pattern, html)
+    if script_match:
+        return script_match.group(1)
+    
+    return ''
 
-def setup_driver():
-    """Configura o driver do Chrome com opções para ambiente headless"""
+def preencher_formulario_api(nome, email, telefone, empresa):
+    """Preenche o formulário usando requests (POST direto)"""
     try:
-        # Instala o Chrome se necessário
-        if not install_chrome():
-            return None
+        # URL do formulário
+        url = "https://gnxgroup.com.br/solucoes/temporarios/"
         
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--disable-extensions")
-        chrome_options.add_argument("--disable-setuid-sandbox")
-        chrome_options.add_argument("--remote-debugging-port=9222")
-        chrome_options.add_argument("--window-size=1920,1080")
-        chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        st.info("🌐 Acessando o site para obter o token...")
         
-        # Tenta usar o ChromeDriver com webdriver-manager
-        try:
-            service = Service(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            return driver
-        except:
-            # Fallback: tenta usar o ChromeDriver do sistema
-            service = Service('/usr/local/bin/chromedriver')
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            return driver
-            
-    except Exception as e:
-        st.error(f"❌ Erro ao configurar driver: {str(e)}")
-        return None
-
-def preencher_formulario(driver, nome, email, telefone, empresa):
-    """Preenche o formulário com os dados fornecidos"""
-    try:
-        # Abrir a página
-        st.info("🌐 Acessando o site...")
-        driver.get("https://gnxgroup.com.br/solucoes/temporarios/")
-        time.sleep(5)
-        
-        # Aguardar o carregamento dos elementos
-        wait = WebDriverWait(driver, 20)
-        
-        # Preencher Nome
-        st.info("📝 Preenchendo nome...")
-        nome_field = wait.until(EC.presence_of_element_located((By.XPATH, "//*[@id='form-field-nome']")))
-        nome_field.clear()
-        nome_field.send_keys(nome)
-        
-        # Preencher Email
-        st.info("📧 Preenchendo email...")
-        email_field = driver.find_element(By.XPATH, "//*[@id='form-field-email']")
-        email_field.clear()
-        email_field.send_keys(email)
-        
-        # Preencher Telefone
-        st.info("📱 Preenchendo telefone...")
-        telefone_field = driver.find_element(By.XPATH, "//*[@id='form-field-telefone']")
-        telefone_field.clear()
-        telefone_field.send_keys(telefone)
-        
-        # Preencher Empresa
-        st.info("🏢 Preenchendo empresa...")
-        empresa_field = driver.find_element(By.XPATH, "//*[@id='form-field-empresa']")
-        empresa_field.clear()
-        empresa_field.send_keys(empresa)
-        
-        # Selecionar Departamento (sorteio)
-        st.info("🎲 Selecionando departamento...")
-        departamento = get_random_departamento()
-        departamento_select = driver.find_element(By.XPATH, "//*[@id='form-field-departamento']")
-        for option in departamento_select.find_elements(By.TAG_NAME, "option"):
-            if option.text == departamento:
-                option.click()
-                break
-        
-        # Selecionar Segmento (sorteio)
-        st.info("🎲 Selecionando segmento...")
-        segmento = get_random_segmento()
-        segmento_select = driver.find_element(By.XPATH, "//*[@id='form-field-segmento']")
-        for option in segmento_select.find_elements(By.TAG_NAME, "option"):
-            if option.text == segmento:
-                option.click()
-                break
-        
-        # Preencher Mensagem com frase aleatória
-        st.info("💬 Gerando mensagem...")
-        mensagem = get_random_frase()
-        mensagem_field = driver.find_element(By.XPATH, "//*[@id='form-field-mensagem_profissional']")
-        mensagem_field.clear()
-        mensagem_field.send_keys(mensagem)
-        
-        # Tentar enviar o formulário (opcional)
-        try:
-            st.info("📤 Enviando formulário...")
-            submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
-            submit_button.click()
-            time.sleep(3)
-        except:
-            st.warning("⚠️ Não foi possível enviar o formulário automaticamente")
-        
-        return {
-            "status": "sucesso",
-            "departamento": departamento,
-            "segmento": segmento,
-            "mensagem": mensagem
+        # Headers para a requisição inicial
+        headers_initial = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
         }
         
+        # Faz a requisição inicial para obter o token
+        session = requests.Session()
+        response = session.get(url, headers=headers_initial)
+        response.raise_for_status()
+        
+        # Extrai o token CSRF
+        token = extrair_csrf_token(response.text)
+        
+        # Seleciona departamento e segmento aleatoriamente
+        departamento = get_random_departamento()
+        segmento = get_random_segmento()
+        mensagem = get_random_frase()
+        
+        st.info("📝 Preparando dados do formulário...")
+        
+        # Dados do formulário
+        form_data = {
+            'form_fields[nome]': nome,
+            'form_fields[email]': email,
+            'form_fields[telefone]': telefone,
+            'form_fields[empresa]': empresa,
+            'form_fields[departamento]': departamento,
+            'form_fields[segmento]': segmento,
+            'form_fields[mensagem_profissional]': mensagem,
+        }
+        
+        # Adiciona token se encontrado
+        if token:
+            form_data['_wpnonce'] = token
+        
+        # Headers para o POST
+        headers_post = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Origin': 'https://gnxgroup.com.br',
+            'Referer': url,
+            'Connection': 'keep-alive',
+        }
+        
+        st.info("📤 Enviando formulário...")
+        
+        # Envia o POST
+        post_response = session.post(
+            url,
+            data=form_data,
+            headers=headers_post,
+            allow_redirects=True
+        )
+        
+        # Verifica se foi bem-sucedido
+        if post_response.status_code == 200:
+            # Verifica se há mensagem de sucesso na página
+            soup = BeautifulSoup(post_response.text, 'html.parser')
+            
+            # Procura por mensagens de sucesso
+            success_messages = soup.find_all(['div', 'p', 'span'], 
+                                           text=re.compile(r'(sucesso|success|enviado|obrigado|agradecimento)', re.I))
+            
+            if success_messages:
+                return {
+                    "status": "sucesso",
+                    "departamento": departamento,
+                    "segmento": segmento,
+                    "mensagem": mensagem,
+                    "detalhe": "Formulário enviado com sucesso!"
+                }
+            else:
+                # Pode ter enviado mesmo sem mensagem de sucesso
+                return {
+                    "status": "sucesso",
+                    "departamento": departamento,
+                    "segmento": segmento,
+                    "mensagem": mensagem,
+                    "detalhe": "Formulário enviado (verifique se recebeu o email de confirmação)"
+                }
+        else:
+            return {
+                "status": "erro",
+                "mensagem_erro": f"Erro {post_response.status_code}: {post_response.text[:200]}"
+            }
+            
+    except requests.exceptions.RequestException as e:
+        return {
+            "status": "erro",
+            "mensagem_erro": f"Erro de conexão: {str(e)}"
+        }
     except Exception as e:
         return {
             "status": "erro",
-            "mensagem_erro": str(e)
+            "mensagem_erro": f"Erro inesperado: {str(e)}"
         }
 
 def main():
@@ -246,36 +232,26 @@ def main():
             st.error("⚠️ Por favor, preencha todos os campos!")
         else:
             with st.spinner("Executando automação... Aguarde!"):
-                try:
-                    # Configurar driver
-                    driver = setup_driver()
+                # Executar automação via API
+                resultado = preencher_formulario_api(nome, email, telefone, empresa)
+                
+                if resultado["status"] == "sucesso":
+                    st.success("✅ Formulário enviado com sucesso!")
                     
-                    if driver is None:
-                        st.error("❌ Não foi possível iniciar o driver. Verifique a instalação do Chrome.")
-                    else:
-                        # Executar automação
-                        resultado = preencher_formulario(driver, nome, email, telefone, empresa)
-                        
-                        driver.quit()
-                        
-                        if resultado["status"] == "sucesso":
-                            st.success("✅ Formulário preenchido com sucesso!")
-                            
-                            # Mostrar detalhes do preenchimento
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                st.metric("📋 Departamento Selecionado", resultado["departamento"])
-                                st.metric("🏢 Segmento Selecionado", resultado["segmento"])
-                            
-                            with col2:
-                                st.text_area("💬 Mensagem Enviada", resultado["mensagem"], height=150)
-                            
-                            st.balloons()
-                        else:
-                            st.error(f"❌ Erro ao preencher o formulário: {resultado['mensagem_erro']}")
-                        
-                except Exception as e:
-                    st.error(f"❌ Erro durante a execução: {str(e)}")
+                    # Mostrar detalhes do preenchimento
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("📋 Departamento Selecionado", resultado["departamento"])
+                        st.metric("🏢 Segmento Selecionado", resultado["segmento"])
+                        if "detalhe" in resultado:
+                            st.info(f"ℹ️ {resultado['detalhe']}")
+                    
+                    with col2:
+                        st.text_area("💬 Mensagem Enviada", resultado["mensagem"], height=150)
+                    
+                    st.balloons()
+                else:
+                    st.error(f"❌ Erro ao enviar formulário: {resultado['mensagem_erro']}")
     
     # Botão para gerar uma frase aleatória
     st.sidebar.markdown("---")
@@ -320,13 +296,13 @@ def main():
     st.subheader("📦 Requisitos do Sistema")
     codigo_requisitos = """
     streamlit>=1.28.0
-    selenium>=4.15.0
-    webdriver-manager>=4.0.1
-    pandas>=2.1.3
+    requests>=2.31.0
+    beautifulsoup4>=4.12.0
+    lxml>=4.9.0
     """
     st.code(codigo_requisitos, language="bash")
     
-    st.caption("Desenvolvido com ❤️ usando Python, Selenium e Streamlit")
+    st.caption("Desenvolvido com ❤️ usando Python, Requests e Streamlit")
 
 if __name__ == "__main__":
     main()
