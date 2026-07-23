@@ -20,8 +20,11 @@ st.set_page_config(
 
 # Carregar CSS personalizado
 def load_css():
-    with open('static/style.css', 'r', encoding='utf-8') as f:
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    try:
+        with open('static/style.css', 'r', encoding='utf-8') as f:
+            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    except:
+        pass
 
 # Carregar CSS
 load_css()
@@ -51,14 +54,19 @@ def main():
             st.error("⚠️ Por favor, preencha todos os campos!")
         else:
             with st.spinner("Executando automação... Aguarde!"):
+                # Selecionar valores aleatórios
+                departamento = get_random_departamento(departamentos)
+                segmento = get_random_segmento(segmentos)
+                mensagem = get_random_frase(frases)
+                
                 resultado = preencher_formulario_api(
                     nome, 
                     email, 
                     telefone, 
                     empresa,
-                    get_random_departamento(departamentos),
-                    get_random_segmento(segmentos),
-                    get_random_frase(frases)
+                    departamento,
+                    segmento,
+                    mensagem
                 )
                 
                 if resultado["status"] == "sucesso":
@@ -109,10 +117,10 @@ def main():
                             with open(log_path, 'r', encoding='utf-8') as f:
                                 txt_content = f.read()
                             
-                            st.text_area("📄 Prévia do Log", txt_content, height=200)
+                            st.text_area("📄 Prévia do Log (CSV com ;)", txt_content, height=150)
                             
                             st.download_button(
-                                label="📥 Baixar Log (TXT)",
+                                label="📥 Baixar Log (CSV com ;)",
                                 data=txt_content,
                                 file_name=resultado["log_txt"],
                                 mime="text/plain",
@@ -131,10 +139,10 @@ def main():
                         if os.path.exists(log_path):
                             with open(log_path, 'r', encoding='utf-8') as f:
                                 txt_content = f.read()
-                            st.text_area("Conteúdo do Log", txt_content, height=200)
+                            st.text_area("Conteúdo do Log", txt_content, height=150)
                             
                             st.download_button(
-                                label="📥 Baixar Log de Erro (TXT)",
+                                label="📥 Baixar Log de Erro",
                                 data=txt_content,
                                 file_name=resultado["log_txt"],
                                 mime="text/plain",
@@ -156,7 +164,7 @@ def main():
     2. Clique em "Executar Automação"
     3. O sistema preencherá automaticamente o formulário
     4. Os campos 'Departamento' e 'Segmento' são sorteados aleatoriamente
-    5. Um arquivo de log em formato de tabela é gerado
+    5. Um arquivo .log é gerado com colunas separadas por ;
     """)
     
     # Estatísticas
