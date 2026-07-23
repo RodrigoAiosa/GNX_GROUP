@@ -5,6 +5,9 @@ import re
 from .log_generator import gerar_arquivo_log_tabela
 import os
 
+# URL do formulário alvo
+URL_FORMULARIO = "https://gnxgroup.com.br/solucoes/temporarios/"
+
 def extrair_csrf_token(html):
     """Extrai o token CSRF do HTML da página"""
     soup = BeautifulSoup(html, 'html.parser')
@@ -31,7 +34,7 @@ def extrair_csrf_token(html):
 def preencher_formulario_api(nome, email, telefone, empresa, departamento, segmento, mensagem):
     """Preenche o formulário usando requests (POST direto) - Modo API"""
     try:
-        url = "https://gnxgroup.com.br/solucoes/temporarios/"
+        url = URL_FORMULARIO
         
         headers_initial = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
