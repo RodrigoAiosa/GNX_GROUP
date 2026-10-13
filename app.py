@@ -11,6 +11,7 @@ from utils.data_manager import (
 from datetime import datetime
 import os
 import time
+from esconder_selo import esconder_selo_streamlit
 
 # Configuração da página
 st.set_page_config(
@@ -18,6 +19,7 @@ st.set_page_config(
     page_icon="🤖",
     layout="wide"
 )
+esconder_selo_streamlit()  # oculta os controles do Streamlit Cloud
 
 # Carregar CSS personalizado
 def load_css():

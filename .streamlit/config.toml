@@ -21,4 +21,4 @@ level = "info"
 
 [client]
 showErrorDetails = true
-toolbarMode = "auto"
+toolbarMode = "minimal"
